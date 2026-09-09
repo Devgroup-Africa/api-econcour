@@ -9,6 +9,7 @@
     "dev": "nodemon server-mongodb.js",
     "init-db": "node scripts/initialize-mongodb.js",
     "verify-db": "node scripts/verify-mongodb.js",
+    "clean:operational-data": "node scripts/clean-operational-data.js",
     "verify:migration": "node scripts/verify-migration-relations.js",
     "migrate:admin-roles": "node scripts/migrate-admin-roles.js",
     "migrate:temporary-passwords": "node scripts/migrate-temporary-passwords.js",

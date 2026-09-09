@@ -204,7 +204,7 @@ class EmailService {
     }
 
     // Envoyer un reçu PDF par email
-    async sendReceiptEmail(candidatData) {
+    async sendReceiptEmail(candidatData, attachment) {
         try {
             console.log('Envoi reçu email à:', candidatData.maican);
 
@@ -232,6 +232,9 @@ class EmailService {
           </div>
         `
             };
+            if (attachment?.content) {
+                mailOptions.attachments = [{filename: attachment.filename || `Recu_Candidature_${candidatData.nupcan}.pdf`, content: attachment.content, encoding: 'base64', contentType: attachment.contentType || 'application/pdf'}];
+            }
 
             await transporter.sendMail(mailOptions);
             console.log('Email reçu envoyé avec succès');
