@@ -17,13 +17,14 @@ const router = express.Router();
 router.use(require('./catalog-management'));
 const {router: candidateAuthRouter, authenticateCandidate, createCandidateSession} = require('./candidate-auth');
 router.use(candidateAuthRouter);
-router.use(['/candidats/nip/:nip', '/candidats/nipcan/:nipcan/dashboard'], authenticateCandidate, (req, res, next) => {
-  if (String(req.params.nip || req.params.nipcan).trim().toUpperCase() !== req.candidate.nipcan) return next(new AppError(403, 'CANDIDATE_FORBIDDEN', 'Ce NIPCAN ne correspond pas à votre compte'));
+router.use(['/candidats/nipcan/:nipcan/dashboard'], authenticateCandidate, (req, res, next) => {
+  if (String(req.params.nipcan).trim().toUpperCase() !== req.candidate.nipcan) return next(new AppError(403, 'CANDIDATE_FORBIDDEN', 'Ce NIPCAN ne correspond pas à votre compte'));
   next();
 });
 router.post('/candidats', (req, res, next) => req.headers['x-candidate-token'] ? authenticateCandidate(req, res, next) : next());
 router.post('/applications', authenticateCandidate, (req, res, next) => {req.body.candidateId = req.candidate._id; req.body.candidate = {firstName: req.candidate.firstName, lastName: req.candidate.lastName, phone: req.candidate.phone}; next();});
 const authenticationLimiter = rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:'draft-7',legacyHeaders:false,message:{success:false,error:{code:'TOO_MANY_AUTH_ATTEMPTS'},message:'Trop de tentatives. Réessayez dans quelques minutes.'}});
+const nipLookupLimiter = rateLimit({windowMs:15*60*1000,limit:60,standardHeaders:'draft-7',legacyHeaders:false,message:{success:false,error:{code:'TOO_MANY_REQUESTS'},message:'Trop de recherches. Réessayez dans quelques minutes.'}});
 const required = (...paths) => (req, _res, next) => { const missing = paths.filter(path => path.split('.').reduce((v,k) => v?.[k], req.body) == null); missing.length ? next(new AppError(422, 'VALIDATION_ERROR', 'Données invalides', missing.map(field => ({ field, message: 'Champ obligatoire' })))) : next(); };
 const requireSuperAdmin=(req,_res,next)=>req.admin?.role==='super_admin'?next():next(new AppError(403,'SUPER_ADMIN_REQUIRED','Accès réservé au super-administrateur'));
 const defaultPermissionsByRole = {
@@ -517,7 +518,7 @@ router.get('/candidats/nipcan/:nipcan/dashboard', asyncHandler(async (req, res) 
     statistiques: { total: candidatures.length, en_cours: applications.filter(application => ['draft', 'submitted', 'under_review'].includes(application.status)).length, completes: applications.filter(application => application.status === 'approved').length }
   }, 'Dashboard candidat chargé');
 }));
-router.get('/candidats/nip/:nip',asyncHandler(async(req,res)=>{
+router.get('/candidats/nip/:nip', nipLookupLimiter, asyncHandler(async(req,res)=>{
   const c=await Candidate.findOne({nipcan:String(req.params.nip).trim().toUpperCase()}).populate('originProvinceId currentProvinceId assignedProvinceId').lean();
   if(!c)throw new AppError(404,'CANDIDATE_NOT_FOUND','Candidat introuvable avec ce NIPCAN');
   const application=await Application.findOne({candidateId:c._id}).sort({createdAt:-1}).populate('contestId').populate('programId').lean();
